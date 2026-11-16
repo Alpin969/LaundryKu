@@ -1,0 +1,31 @@
+{
+  "name": "laundryku-backend",
+  "version": "1.0.0",
+  "description": "REST API backend LaundryKu - Express.js dan PostgreSQL (Aiven)",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "laundryku",
+    "express",
+    "postgresql",
+    "rest-api"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
