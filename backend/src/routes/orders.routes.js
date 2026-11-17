@@ -25,6 +25,10 @@ router.get('/:id', ordersController.detail);
 router.patch('/:id/status', requireRole('ADMIN'), ordersController.ubahStatus);
 router.patch('/:id/berat-asli', requireRole('ADMIN'), ordersController.isiBeratAsli);
 
+// Admin mengonfirmasi uang tunai sudah diterima. Metode pembayaran lain
+// langsung dianggap lunas saat pesanan dibuat, jadi tidak melewati endpoint ini.
+router.patch('/:id/bayar', requireRole('ADMIN'), ordersController.konfirmasiBayar);
+
 // Pembatalan bisa dilakukan customer (pesanan sendiri) maupun admin.
 router.patch('/:id/batal', ordersController.batalkan);
 

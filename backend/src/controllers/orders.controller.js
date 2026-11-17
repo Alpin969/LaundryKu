@@ -41,6 +41,11 @@ const TRANSISI = {
 // Status yang dianggap sudah final dan tidak bisa diubah lagi.
 const STATUS_FINAL = ['COMPLETED', 'CANCELLED'];
 
+// Metode pembayaran yang diterima. Tunai baru dianggap lunas setelah admin
+// mengonfirmasi uangnya diterima; metode lain dianggap berhasil seketika
+// karena pembayarannya masih simulasi pada tahap ini.
+const METODE_PEMBAYARAN = ['CASH', 'QRIS', 'BANK_TRANSFER', 'EWALLET'];
+
 // Batas jumlah baris yang boleh diminta sekali ambil.
 const LIMIT_DEFAULT = 50;
 const LIMIT_MAKS = 100;
@@ -61,7 +66,10 @@ const SELECT_PESANAN = `
          o.total_price,
          o.status,
          o.photo_url,
-         o.created_at
+         o.created_at,
+         o.payment_method,
+         o.payment_status,
+         o.paid_at
     FROM orders o
     JOIN users u    ON u.id = o.user_id
     JOIN services s ON s.id = o.service_id`;
@@ -105,17 +113,32 @@ async function buat(req, res) {
     max: 999999,
   });
 
+  // Metode pembayaran boleh belum diisi oleh pemanggil lama. Aplikasi mobile
+  // selalu mengirimnya lewat halaman pembayaran.
+  const metode = kosong(req.body.payment_method)
+    ? null
+    : asEnum(req.body.payment_method, 'payment_method', METODE_PEMBAYARAN);
+
+  // Tunai baru lunas setelah admin mengonfirmasi uangnya diterima. Metode
+  // lain langsung dianggap lunas karena pembayarannya masih simulasi.
+  const statusBayar =
+    metode === null ? null : metode === 'CASH' ? 'UNPAID' : 'PAID';
+
   // Harga diambil langsung dari tabel services di dalam satu pernyataan SQL.
   // Dengan begitu harga tidak bisa dipalsukan lewat body permintaan, dan
   // tidak ada celah waktu antara "membaca harga" dan "menyimpan pesanan".
   const hasil = await query(
-    `INSERT INTO orders (user_id, service_id, estimated_weight, price_per_kg, status)
-     SELECT $1, s.id, $2, s.price_per_kg, 'PENDING_CONFIRMATION'
+    `INSERT INTO orders (user_id, service_id, estimated_weight, price_per_kg, status,
+                         payment_method, payment_status, paid_at)
+     SELECT $1, s.id, $2, s.price_per_kg, 'PENDING_CONFIRMATION',
+            $4::text, $5::text,
+            CASE WHEN $5::text = 'PAID' THEN NOW() ELSE NULL END
        FROM services s
       WHERE s.id = $3
      RETURNING id, user_id, service_id, estimated_weight, actual_weight,
-               price_per_kg, total_price, status, photo_url, created_at;`,
-    [req.user.id, estimasi, serviceId]
+               price_per_kg, total_price, status, photo_url, created_at,
+               payment_method, payment_status, paid_at;`,
+    [req.user.id, estimasi, serviceId, metode, statusBayar]
   );
 
   if (hasil.rowCount === 0) {
@@ -124,7 +147,10 @@ async function buat(req, res) {
 
   res.status(201).json({
     success: true,
-    message: 'Pesanan berhasil dibuat dan menunggu konfirmasi admin.',
+    message:
+      statusBayar === 'PAID'
+        ? 'Pesanan berhasil dibuat dan pembayarannya diterima.'
+        : 'Pesanan berhasil dibuat dan menunggu konfirmasi admin.',
     data: hasil.rows[0],
   });
 }
@@ -193,7 +219,11 @@ async function ubahStatus(req, res) {
   const id = asId(req.params.id);
   const statusBaru = asEnum(req.body.status, 'status', STATUS);
 
-  const hasilLama = await query('SELECT id, status, actual_weight FROM orders WHERE id = $1;', [id]);
+  const hasilLama = await query(
+    `SELECT id, status, actual_weight, payment_method, payment_status
+       FROM orders WHERE id = $1;`,
+    [id]
+  );
 
   if (hasilLama.rowCount === 0) {
     throw AppError.notFound(`Pesanan dengan id ${id} tidak ditemukan.`);
@@ -226,6 +256,21 @@ async function ubahStatus(req, res) {
       'Berat asli pesanan belum diisi, sehingga harga akhir belum diketahui. ' +
         'Isi berat asli terlebih dahulu sebelum menyelesaikan pesanan.',
       'ACTUAL_WEIGHT_REQUIRED'
+    );
+  }
+
+  // Pakaian diserahkan setelah dibayar, jadi pesanan yang sudah mencatat
+  // metode pembayaran tidak boleh diselesaikan selagi belum lunas. Pesanan
+  // lama yang belum mencatat metode pembayaran tidak ikut dihalangi.
+  if (
+    statusBaru === 'COMPLETED' &&
+    sekarang.payment_method !== null &&
+    sekarang.payment_status !== 'PAID'
+  ) {
+    throw AppError.conflict(
+      'Pembayaran pesanan ini belum lunas. Konfirmasi pembayarannya lebih ' +
+        'dahulu sebelum menyelesaikan pesanan.',
+      'PAYMENT_REQUIRED'
     );
   }
 
@@ -295,6 +340,60 @@ async function isiBeratAsli(req, res) {
   res.status(200).json({
     success: true,
     message: 'Berat asli dan harga akhir pesanan berhasil disimpan.',
+    data: pesanan,
+  });
+}
+
+// PATCH /api/orders/:id/bayar  (ADMIN)
+// Menandai pembayaran pesanan sudah diterima. Dipakai untuk pembayaran tunai,
+// yang uangnya baru benar-benar diterima saat pakaian diambil.
+//
+// Metode pembayaran tidak ikut diubah di sini: pesanan lama bisa saja belum
+// mencatat metodenya, dan menebaknya sebagai tunai berarti menulis data yang
+// tidak pernah dipilih pelanggan.
+async function konfirmasiBayar(req, res) {
+  const id = asId(req.params.id);
+
+  const hasilLama = await query(
+    'SELECT id, payment_status FROM orders WHERE id = $1;',
+    [id]
+  );
+
+  if (hasilLama.rowCount === 0) {
+    throw AppError.notFound(`Pesanan dengan id ${id} tidak ditemukan.`);
+  }
+
+  if (hasilLama.rows[0].payment_status === 'PAID') {
+    throw AppError.conflict(
+      'Pembayaran pesanan ini sudah dikonfirmasi sebelumnya.',
+      'PAYMENT_ALREADY_PAID'
+    );
+  }
+
+  // Syarat statusnya membuat konfirmasi ganda dari dua admin tidak saling
+  // menimpa: yang kalah mendapat pesan bahwa pembayarannya sudah lunas.
+  const hasil = await query(
+    `UPDATE orders
+        SET payment_status = 'PAID',
+            paid_at = NOW()
+      WHERE id = $1
+        AND payment_status IS DISTINCT FROM 'PAID'
+      RETURNING id;`,
+    [id]
+  );
+
+  if (hasil.rowCount === 0) {
+    throw AppError.conflict(
+      'Pembayaran pesanan ini sudah dikonfirmasi sebelumnya.',
+      'PAYMENT_ALREADY_PAID'
+    );
+  }
+
+  const pesanan = await ambilPesananYangBolehDilihat(id, req.user);
+
+  res.status(200).json({
+    success: true,
+    message: 'Pembayaran pesanan berhasil dikonfirmasi.',
     data: pesanan,
   });
 }
@@ -430,6 +529,7 @@ module.exports = {
   detail,
   ubahStatus,
   isiBeratAsli,
+  konfirmasiBayar,
   batalkan,
   unggahFoto,
   hapusFoto,

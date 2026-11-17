@@ -84,6 +84,14 @@ CREATE TABLE IF NOT EXISTS orders (
 
     photo_url TEXT,
 
+    -- Pembayaran. Tunai baru lunas setelah admin mengonfirmasi uangnya
+    -- diterima, sedangkan metode lain langsung dianggap lunas saat pesanan
+    -- dibuat. Ketiganya boleh kosong untuk pesanan lama yang belum mencatat
+    -- metode pembayaran.
+    payment_method VARCHAR(20),
+    payment_status VARCHAR(20),
+    paid_at TIMESTAMPTZ,
+
     created_at TIMESTAMPTZ NOT NULL
         DEFAULT CURRENT_TIMESTAMP,
 
@@ -134,6 +142,31 @@ CREATE TABLE IF NOT EXISTS orders (
                 'COMPLETED',
                 'CANCELLED'
             )
+        ),
+
+    CONSTRAINT chk_orders_payment_method
+        CHECK (
+            payment_method IS NULL
+            OR payment_method IN (
+                'CASH',
+                'QRIS',
+                'BANK_TRANSFER',
+                'EWALLET'
+            )
+        ),
+
+    CONSTRAINT chk_orders_payment_status
+        CHECK (
+            payment_status IS NULL
+            OR payment_status IN ('UNPAID', 'PAID')
+        ),
+
+    -- Waktu pembayaran hanya boleh terisi bila statusnya memang sudah lunas.
+    CONSTRAINT chk_orders_paid_at
+        CHECK (
+            (payment_status IS NULL AND paid_at IS NULL)
+            OR (payment_status = 'UNPAID' AND paid_at IS NULL)
+            OR (payment_status = 'PAID' AND paid_at IS NOT NULL)
         )
 );
 
@@ -145,6 +178,9 @@ ON orders (service_id);
 
 CREATE INDEX IF NOT EXISTS idx_orders_status_created
 ON orders (status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_orders_payment_status
+ON orders (payment_status, created_at DESC);
 
 
 -- =========================================
