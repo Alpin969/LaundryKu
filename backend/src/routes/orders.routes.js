@@ -31,4 +31,8 @@ router.patch('/:id/batal', ordersController.batalkan);
 // unggahFoto mengurai multipart/form-data dengan nama field "photo".
 router.patch('/:id/foto', unggahFoto.single('photo'), ordersController.unggahFoto);
 
+// Menghapus foto pesanan. Pemilik pesanan maupun admin boleh melakukannya,
+// sama seperti aturan pengunggahan foto di atas.
+router.delete('/:id/foto', ordersController.hapusFoto);
+
 module.exports = router;

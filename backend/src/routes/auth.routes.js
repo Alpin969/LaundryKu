@@ -32,4 +32,8 @@ router.post('/register', batasPercobaanAuth, authController.register);
 router.post('/login', batasPercobaanAuth, authController.login);
 router.get('/me', authenticate, authController.me);
 
+// Mengubah nama dan/atau kata sandi akun yang sedang masuk. Dibatasi
+// percobaannya karena penggantian kata sandi memeriksa kata sandi lama.
+router.patch('/me', batasPercobaanAuth, authenticate, authController.ubahProfil);
+
 module.exports = router;

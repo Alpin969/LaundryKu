@@ -21,6 +21,15 @@ const PETA_KODE = {
       'FOREIGN_KEY_VIOLATION'
     ),
 
+  // restrict_violation - kode yang dipakai PostgreSQL untuk pelanggaran
+  // ON DELETE RESTRICT. Tanpa pemetaan ini, penghapusan data yang masih
+  // dipakai menjawab HTTP 500 dan kode mentahnya ikut terkirim ke client.
+  '23001': () =>
+    AppError.conflict(
+      'Data ini masih dipakai oleh data lain, sehingga belum bisa dihapus.',
+      'DATA_IN_USE'
+    ),
+
   // not_null_violation
   23502: () =>
     AppError.badRequest('Ada kolom wajib yang belum diisi.', 'MISSING_VALUE'),

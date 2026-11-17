@@ -387,6 +387,43 @@ async function unggahFoto(req, res) {
   });
 }
 
+// DELETE /api/orders/:id/foto
+// Menghapus foto pesanan. Pemilik pesanan maupun admin boleh melakukannya,
+// sama seperti aturan pada pengunggahan foto.
+async function hapusFoto(req, res) {
+  const id = asId(req.params.id);
+
+  // Dipastikan dulu bahwa pemakainya berhak atas pesanan ini.
+  const pesanan = await ambilPesananYangBolehDilihat(id, req.user);
+
+  if (!pesanan.photo_url) {
+    throw AppError.notFound(
+      'Pesanan ini tidak punya foto yang bisa dihapus.',
+      'FILE_NOT_FOUND'
+    );
+  }
+
+  const hasil = await query(
+    'UPDATE orders SET photo_url = NULL WHERE id = $1 RETURNING id;',
+    [id]
+  );
+
+  if (hasil.rowCount === 0) {
+    throw AppError.notFound(`Pesanan dengan id ${id} tidak ditemukan.`);
+  }
+
+  // Berkasnya dibuang setelah kolomnya benar-benar kosong.
+  await hapusFotoLama(pesanan.photo_url);
+
+  const pesananTerbaru = await ambilPesananYangBolehDilihat(id, req.user);
+
+  res.status(200).json({
+    success: true,
+    message: 'Foto pesanan berhasil dihapus.',
+    data: pesananTerbaru,
+  });
+}
+
 module.exports = {
   buat,
   daftar,
@@ -395,6 +432,7 @@ module.exports = {
   isiBeratAsli,
   batalkan,
   unggahFoto,
+  hapusFoto,
   STATUS,
   TRANSISI,
 };

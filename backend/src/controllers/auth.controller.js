@@ -9,7 +9,7 @@ const bcrypt = require('bcryptjs');
 
 const { query } = require('../config/database');
 const AppError = require('../utils/AppError');
-const { asString, asEmail } = require('../utils/validate');
+const { asString, asEmail, kosong } = require('../utils/validate');
 const { terjemahkanDenganConstraint } = require('../utils/pgError');
 const { buatToken, siapDipakai } = require('../utils/jwt');
 
@@ -124,8 +124,91 @@ async function me(req, res) {
   });
 }
 
+// PATCH /api/auth/me - mengubah nama dan/atau kata sandi akun sendiri
+//
+// Penggantian kata sandi WAJIB menyertakan kata sandi lama. Tanpa itu, siapa
+// pun yang sempat memegang token bisa mengunci pemilik akun dari luar.
+async function ubahProfil(req, res) {
+  const gantiNama = req.body.name !== undefined;
+  const gantiSandi = req.body.new_password !== undefined;
+
+  if (!gantiNama && !gantiSandi) {
+    throw AppError.badRequest(
+      'Tidak ada yang diubah. Kirim "name" untuk mengubah nama, atau ' +
+        '"current_password" dan "new_password" untuk mengganti kata sandi.',
+      'NO_CHANGE'
+    );
+  }
+
+  let namaBaru = null;
+  if (gantiNama) {
+    namaBaru = asString(req.body.name, 'name', { min: 1, max: 100 });
+  }
+
+  let passwordHashBaru = null;
+  if (gantiSandi) {
+    if (kosong(req.body.current_password)) {
+      throw AppError.badRequest(
+        'Kata sandi saat ini wajib diisi untuk mengganti kata sandi.',
+        'CURRENT_PASSWORD_REQUIRED'
+      );
+    }
+
+    const sandiLama = asString(req.body.current_password, 'current_password', {
+      min: 1,
+      max: 200,
+    });
+    const sandiBaru = asString(req.body.new_password, 'new_password', {
+      min: PANJANG_PASSWORD_MIN,
+      max: PANJANG_PASSWORD_MAX,
+    });
+
+    const hasilCek = await query(
+      'SELECT password_hash FROM users WHERE id = $1;',
+      [req.user.id]
+    );
+    const baris = hasilCek.rows[0];
+
+    if (!baris || !baris.password_hash) {
+      throw AppError.unauthorized('Akun tidak ditemukan.', 'ACCOUNT_NOT_FOUND');
+    }
+
+    const cocok = await bcrypt.compare(sandiLama, baris.password_hash);
+    if (!cocok) {
+      throw AppError.unauthorized(
+        'Kata sandi saat ini salah.',
+        'INVALID_CURRENT_PASSWORD'
+      );
+    }
+
+    passwordHashBaru = await bcrypt.hash(sandiBaru, PUTARAN_BCRYPT);
+  }
+
+  const hasil = await query(
+    `UPDATE users
+        SET name          = COALESCE($1, name),
+            password_hash = COALESCE($2, password_hash)
+      WHERE id = $3
+      RETURNING ${KOLOM_AMAN};`,
+    [namaBaru, passwordHashBaru, req.user.id]
+  );
+
+  if (hasil.rowCount === 0) {
+    throw AppError.notFound('Akun tidak ditemukan.', 'ACCOUNT_NOT_FOUND');
+  }
+
+  res.status(200).json({
+    success: true,
+    message: passwordHashBaru
+      ? 'Nama dan kata sandi berhasil diperbarui.'
+      : 'Nama berhasil diperbarui.',
+    data: { user: hasil.rows[0] },
+  });
+}
+
 module.exports = {
   register,
   login,
   me,
+  ubahProfil,
 };

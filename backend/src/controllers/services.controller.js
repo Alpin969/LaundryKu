@@ -158,7 +158,12 @@ async function hapus(req, res) {
     // Layanan yang sudah dipakai pada pesanan tidak boleh dihapus, karena
     // foreign key memakai ON DELETE RESTRICT. Kasus ini dijelaskan apa adanya
     // supaya admin tahu kenapa gagal, bukan sekadar "terjadi kesalahan".
-    if (error.code === '23503') {
+    //
+    // Dua kode harus diperiksa: 23503 (foreign_key_violation) dan 23001
+    // (restrict_violation). PostgreSQL memakai 23001 untuk pelanggaran
+    // ON DELETE RESTRICT, dan sebelumnya kode itu tidak ikut diperiksa
+    // sehingga permintaan ini menjawab HTTP 500 dengan kode mentah.
+    if (error.code === '23503' || error.code === '23001') {
       throw AppError.conflict(
         'Layanan ini tidak bisa dihapus karena masih dipakai pada pesanan. ' +
           'Ubah atau batalkan pesanan tersebut terlebih dahulu.',
