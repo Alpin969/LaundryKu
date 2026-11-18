@@ -1,6 +1,13 @@
 -- =========================================
 -- DATABASE LAUNDRYKU
 -- PostgreSQL - Aiven
+--
+-- Berkas ini aman dijalankan berulang pada database yang sudah berisi data:
+--   psql "$DATABASE_URL" -f database/schema.sql
+--
+-- Struktur yang sudah ada tidak ditimpa. Tabel dibuat bila belum ada, kolom
+-- pembayaran ditambahkan bila belum ada, dan pemeriksaan di bagian akhir
+-- hanya membaca.
 -- =========================================
 
 BEGIN;
@@ -184,14 +191,110 @@ ON orders (payment_status, created_at DESC);
 
 
 -- =========================================
--- 4. SELESAI MEMBUAT STRUKTUR DATABASE
+-- 4. PEMBARUAN UNTUK DATABASE YANG SUDAH BERISI
+--
+-- CREATE TABLE IF NOT EXISTS di atas tidak menambah kolom ke tabel yang
+-- sudah terlanjur dibuat sebelum kolom pembayaran ada. Bagian ini menutup
+-- selisih itu tanpa menyentuh data yang sudah tersimpan.
 -- =========================================
+
+-- Aplikasi mobile mengirim metode pembayaran saat pesanan dibuat, dan admin
+-- memakai status pembayaran untuk mengonfirmasi uang tunai. Tanpa tiga kolom
+-- ini, pesanan dari aplikasi ditolak dengan "kolom payment_method tidak ada".
+ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20),
+    ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+
+-- ADD COLUMN IF NOT EXISTS melewati kolom yang sudah ada, termasuk
+-- constraint-nya, jadi aturan di bawah hanya ditambahkan bila belum ada.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'chk_orders_payment_method'
+    ) THEN
+        ALTER TABLE orders
+            ADD CONSTRAINT chk_orders_payment_method
+            CHECK (
+                payment_method IS NULL
+                OR payment_method IN ('CASH', 'QRIS', 'BANK_TRANSFER', 'EWALLET')
+            );
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'chk_orders_payment_status'
+    ) THEN
+        ALTER TABLE orders
+            ADD CONSTRAINT chk_orders_payment_status
+            CHECK (
+                payment_status IS NULL
+                OR payment_status IN ('UNPAID', 'PAID')
+            );
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'chk_orders_paid_at'
+    ) THEN
+        ALTER TABLE orders
+            ADD CONSTRAINT chk_orders_paid_at
+            CHECK (
+                (payment_status IS NULL AND paid_at IS NULL)
+                OR (payment_status = 'UNPAID' AND paid_at IS NULL)
+                OR (payment_status = 'PAID' AND paid_at IS NOT NULL)
+            );
+    END IF;
+END
+$$;
+
+-- Layanan yang masih dipakai pesanan tidak boleh terhapus, sehingga riwayat
+-- pesanan pelanggan tetap utuh.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_orders_service'
+    ) THEN
+        ALTER TABLE orders
+            ADD CONSTRAINT fk_orders_service
+            FOREIGN KEY (service_id)
+            REFERENCES services(id)
+            ON UPDATE CASCADE
+            ON DELETE RESTRICT;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_orders_user'
+    ) THEN
+        ALTER TABLE orders
+            ADD CONSTRAINT fk_orders_user
+            FOREIGN KEY (user_id)
+            REFERENCES users(id)
+            ON UPDATE CASCADE
+            ON DELETE RESTRICT;
+    END IF;
+END
+$$;
+
+-- Keempat index ini dibuat dengan IF NOT EXISTS, jadi aman diulang.
+CREATE INDEX IF NOT EXISTS idx_orders_user_created
+ON orders (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_orders_service_id
+ON orders (service_id);
+
+CREATE INDEX IF NOT EXISTS idx_orders_status_created
+ON orders (status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_orders_payment_status
+ON orders (payment_status, created_at DESC);
 
 COMMIT;
 
 
 -- =========================================
 -- 5. PEMERIKSAAN DATABASE
+--
+-- Bagian ini hanya membaca, supaya berkasnya tetap aman dijalankan pada
+-- database berisi data tanpa mengubah apa pun.
 -- =========================================
 
 SELECT current_database();
@@ -222,3 +325,18 @@ WHERE tc.table_schema = 'public'
 ORDER BY
     tc.table_name,
     tc.constraint_type;
+
+
+-- =========================================
+-- 7. MEMERIKSA KOLOM TABEL ORDERS
+-- =========================================
+
+SELECT
+    column_name,
+    data_type,
+    is_nullable,
+    column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'orders'
+ORDER BY ordinal_position;

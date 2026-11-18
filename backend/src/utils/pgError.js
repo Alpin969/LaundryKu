@@ -64,7 +64,7 @@ function terjemahkan(error) {
 // bagian mana yang salah.
 //
 // PENTING: kunci di bawah harus SAMA PERSIS dengan nama constraint di
-// database (lihat berkas db_LaundryKu.sql). Bila namanya tidak cocok,
+// database (lihat database/schema.sql). Bila namanya tidak cocok,
 // pesan khusus ini tidak akan pernah muncul dan pengguna hanya menerima
 // pesan umum dari PETA_KODE di atas.
 const PESAN_CONSTRAINT = {
@@ -86,6 +86,11 @@ const PESAN_CONSTRAINT = {
   chk_orders_total_and_actual_weight:
     'Berat asli dan harga akhir pesanan harus diisi bersama-sama.',
   chk_orders_status: 'Status pesanan tidak dikenali.',
+  chk_orders_payment_method:
+    'Metode pembayaran harus salah satu dari: CASH, QRIS, BANK_TRANSFER, EWALLET.',
+  chk_orders_payment_status: 'Status pembayaran harus UNPAID atau PAID.',
+  chk_orders_paid_at:
+    'Waktu pembayaran hanya boleh diisi untuk pesanan yang sudah lunas.',
 };
 
 function terjemahkanDenganConstraint(error) {

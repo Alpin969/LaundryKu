@@ -66,8 +66,10 @@ Skema ada di `database/schema.sql` dan berisi tiga tabel: `users`, `services`,
 psql "$DATABASE_URL" -f database/schema.sql
 ```
 
-Berkas itu hanya membuat tabel bila belum ada (`IF NOT EXISTS`), jadi aman
-dijalankan berulang.
+Berkas itu aman dijalankan berulang, termasuk pada database yang sudah berisi
+data. Tabel dibuat bila belum ada, kolom pembayaran (`payment_method`,
+`payment_status`, `paid_at`) ditambahkan bila belum ada, dan bagian
+pemeriksaan di akhir berkas hanya membaca.
 
 ## Membuat akun admin
 
@@ -103,11 +105,13 @@ Sertakan header `Authorization: Bearer <token>`.
 | Method | Endpoint | Keterangan |
 |---|---|---|
 | GET | `/api/auth/me` | Data akun yang sedang masuk |
-| POST | `/api/orders` | Buat pesanan (khusus CUSTOMER) |
+| PATCH | `/api/auth/me` | Ubah nama dan/atau kata sandi sendiri |
+| POST | `/api/orders` | Buat pesanan (khusus CUSTOMER), boleh menyertakan `payment_method` |
 | GET | `/api/orders` | Daftar pesanan (bisa `?status=` dan `?limit=`) |
 | GET | `/api/orders/:id` | Detail pesanan |
 | PATCH | `/api/orders/:id/batal` | Batalkan pesanan |
 | PATCH | `/api/orders/:id/foto` | Unggah foto (`multipart/form-data`, field `photo`) |
+| DELETE | `/api/orders/:id/foto` | Hapus foto pesanan |
 
 Customer hanya melihat pesanannya sendiri. Admin melihat semua pesanan.
 
@@ -120,6 +124,12 @@ Customer hanya melihat pesanannya sendiri. Admin melihat semua pesanan.
 | DELETE | `/api/services/:id` | Hapus layanan |
 | PATCH | `/api/orders/:id/status` | Ubah status pesanan |
 | PATCH | `/api/orders/:id/berat-asli` | Isi berat asli, harga akhir dihitung otomatis |
+| PATCH | `/api/orders/:id/bayar` | Konfirmasi pembayaran tunai sudah diterima |
+
+Metode pembayaran: `CASH`, `QRIS`, `BANK_TRANSFER`, `EWALLET`. Tunai dicatat
+`UNPAID` sampai admin mengonfirmasinya lewat `/bayar`, sedangkan metode lain
+langsung dicatat `PAID` saat pesanan dibuat karena pembayarannya masih
+simulasi.
 
 ## Alur status pesanan
 
