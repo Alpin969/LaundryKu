@@ -2,7 +2,7 @@
 
 Website admin RENOVA untuk mengelola layanan dan pesanan laundry. Dibangun
 dengan HTML, CSS, dan JavaScript murni (tanpa framework), dan seluruh datanya
-diambil dari REST API backend LaundryKu yang sudah ada.
+diambil dari REST API backend RENOVA yang sudah ada.
 
 ## Menjalankan
 

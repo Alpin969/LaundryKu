@@ -1,4 +1,4 @@
-// Pusat komunikasi dengan backend LaundryKu.
+// Pusat komunikasi dengan backend RENOVA.
 //
 // Semua permintaan lewat sini supaya penanganan token, bentuk respons, dan
 // pesan kesalahan konsisten di seluruh halaman.
