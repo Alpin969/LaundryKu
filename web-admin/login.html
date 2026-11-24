@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Masuk Admin — RENOVA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/style.css" />
+  </head>
+  <body>
+    <main class="layar-auth">
+      <div class="kartu-auth">
+        <div class="auth-kepala">
+          <svg width="56" height="56" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path
+              d="M24 5C24 5 12 18.4 12 28a12 12 0 0 0 24 0C36 18.4 24 5 24 5Z"
+              fill="#CFFAFE"
+              stroke="#0E7490"
+              stroke-width="2.4"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M18.5 25.5 23 22l3 2.6 4.5-4.1"
+              stroke="#0E7490"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path d="M24 40.5V33" stroke="#06B6D4" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+          <h1 class="auth-judul">RENOVA</h1>
+          <p class="auth-sub">Laundry Management Platform</p>
+        </div>
+
+        <div class="kotak-info" id="pesan-galat" hidden role="alert"></div>
+
+        <form id="form-login" novalidate>
+          <div class="form-baris">
+            <label for="email">Email admin</label>
+            <input
+              class="isian"
+              id="email"
+              name="email"
+              type="email"
+              autocomplete="username"
+              placeholder="nama@email.com"
+              required
+            />
+          </div>
+
+          <div class="form-baris">
+            <label for="password">Kata sandi</label>
+            <div class="kotak-kata-sandi">
+              <input
+                class="isian"
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Kata sandi akun admin"
+                required
+              />
+              <button
+                type="button"
+                class="tombol-lihat-sandi"
+                id="lihat-sandi"
+                aria-label="Tampilkan kata sandi"
+                aria-pressed="false"
+              >
+                <span id="ikon-lihat">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="tombol" id="tombol-masuk" style="width: 100%; margin-top: 4px">
+            Masuk
+          </button>
+        </form>
+
+        <p class="auth-sub" style="text-align: center; margin-top: 18px">
+          Halaman ini hanya untuk pengelola laundry.<br />
+          Akun pelanggan masuk melalui aplikasi RENOVA.
+        </p>
+      </div>
+    </main>
+
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/ui.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/login.js"></script>
+  </body>
+</html>

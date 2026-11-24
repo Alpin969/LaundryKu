@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RENOVA — Laundry Management Platform</title>
+    <meta name="description" content="Website admin RENOVA untuk mengelola pesanan dan layanan laundry." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/style.css" />
+
+    <!-- Pengalihan awal: halaman ini hanya pintu masuk. Sesi diperiksa di
+         skrip supaya pengguna tanpa token langsung menuju login. -->
+    <script>
+      (function () {
+        const token = sessionStorage.getItem('renova_admin_token');
+        window.location.replace(token ? 'dashboard.html' : 'login.html');
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="layar-auth">
+      <div class="keadaan">
+        <div class="pemuat"></div>
+        <span>Membuka RENOVA...</span>
+      </div>
+    </div>
+  </body>
+</html>
